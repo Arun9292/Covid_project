@@ -1,0 +1,107 @@
+/*
+Data Exploration of Covid 19 data.
+
+
+show variables like 'local_infile'
+SHOW VARIABLES LIKE "secure_file_priv"
+
+set global local_infile = 1
+
+LOAD DATA LOCAL INFILE 'C:\\Users\\Arun\\Desktop\\Covid_deaths.csv' 
+INTO TABLE covid_deaths 
+FIELDS TERMINATED BY ',' 
+ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 ROWS;
+
+
+LOAD DATA LOCAL INFILE 'C:\\Users\\Arun\\Desktop\\Covid_vaccination.csv' 
+INTO TABLE covid_vaccination
+FIELDS TERMINATED BY ',' 
+ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
+IGNORE 1 ROWS;
+
+-- -------------------------------------
+
+select  date,location,population, total_cases, new_cases, total_deaths, round((total_deaths/total_cases)*100, 3) Death_percentage
+from covid_deaths
+where location = "India"
+
+-- - Total cases vs Population
+
+select  date,location, total_cases, new_cases, total_deaths,population, round((total_cases/population)*100,3) Infection_rate
+from covid_deaths
+where location = "India"
+order by infection_rate desc
+
+-- Countries with highest infection rate 
+
+select location,population,max(total_cases) Highest_infrate,
+Round(max((total_cases/population))*100, 3) Infected_percentage 
+from covid_deaths
+-- where location = 'India'
+group by location, population
+order by Infected_percentage desc	
+
+-- Countries with highest death rate 
+
+select location, max(cast(total_deaths as SIGNED )) as Total_deathcount, continent
+from covid_deaths
+-- where continent is not null
+group by location
+order by Total_deathcount desc
+
+-- continent with highest death count
+
+select continent, max(cast(total_deaths as SIGNED )) as Total_deathcount
+from covid_deaths
+where continent is not NULL
+group by continent
+order by Total_deathcount desc
+
+-- New cases by date
+
+select date, SUM(new_cases) as new_cases, SUM(cast(new_deaths as SIGNED)) as new_deaths ,
+SUM(cast(new_deaths as SIGNED))/ SUM(new_cases)*100 as Newdeath_percentage
+from covid_deaths
+where continent is not NULL
+group by date
+order by 1 
+
+-- Total population and vaccinations with date
+
+select cd.date,cd.location,cd.continent, cv.new_vaccinations as New_vac
+from covid_deaths cd
+join covid_vaccination cv
+on cd.location = cv.location and cd.date = cv.date
+where cd.continent is not NULL
+order by 1,2
+
+-- Total population vs total vaccinantions
+
+
+
+select cd.date,cd.location,cd.continent, cv.new_vaccinations as New_vac,
+SUM(cast(cv.new_vaccinations as SIGNED)) over (partition by cd.location order by cd.location, cd.date) People_vaccinated
+from covid_deaths cd
+join covid_vaccination cv
+on cd.location = cv.location and cd.date = cv.date
+where cd.continent is not null
+order by 2,3
+
+
+-- Using CTE for Total population vs total vaccinantions percentage 
+
+with CTE as
+(
+select cd.location,cd.continent, cv.new_vaccinations as New_vac,population,
+SUM(cast(cv.new_vaccinations as SIGNED)) over (partition by cd.location order by cd.location, cd.date) People_vaccinated
+from covid_deaths cd
+join covid_vaccination cv
+on cd.location = cv.location and cd.date = cv.date
+where cd.continent is not null
+)
+Select *,  round((People_vaccinated/ population)*100,3) as People_vaccinated_percentage
+from CTE
+order by People_vaccinated_percentage desc
